@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Minecraft Enchant Tool – Kompatibilitäts-Check</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {font-family:'Inter',Arial,sans-serif;background:#181a23;color:#f5f5fa;margin:0;}
+    .main {max-width:950px;margin:32px auto 50px auto;background:#222840;border-radius:18px;box-shadow:0 12px 40px #0003;padding:34px 24px;}
+    h1 {color:#a259f7;text-align:center;margin-top:0;}
+    h2 {color:#a259f7;margin-bottom:8px;}
+    label {font-weight:bold;}
+    .section {background:#282646;border-radius:12px;padding:22px 18px 10px 18px;margin-bottom:18px;}
+    select, button, input[type=number] {background:#181a23;color:#f5f5fa;border:1px solid #a259f7;border-radius:8px;padding:9px 10px;font-size:1em;margin-bottom:7px;width:100%;box-sizing:border-box;}
+    button {background:#a259f7; color:#fff; font-weight:bold; border:none; transition:background 0.16s;}
+    button:hover {background:#5c2b94;}
+    .steps {margin:18px 0;}
+    .step {background:#201539;border-radius:7px;margin-bottom:11px;padding:10px 14px 8px 14px;border-left:5px solid #a259f7;}
+    .warn {background:#321a23;color:#ffb9d1;font-weight:bold;border-radius:8px;margin-bottom:10px;padding:7px 10px;}
+    pre.exportbox{background:#201539;color:#dbcfec;padding:10px;border-radius:8px;margin-top:10px;overflow-x:auto;}
+    em {color:#ffd98a;font-style:italic;}
+    b.ench{color:#ffd86b;font-weight:700;}
+    .dech{color:#aee4eb;}
+    .incompmsg{color:#ff9d8a;font-size:0.97em;}
+    @media(max-width:600px){.main{padding:6vw 3vw;}}
+  </style>
+</head>
+<body>
+<div class="main">
+<h1>Minecraft Enchant Tool <span style="font-size:0.8em;color:#dedbfd;">- Kompatibilitätsprüfung</span></h1>
+<div class="section">
+  <h2>Item auswählen</h2>
+  <select id="item" onchange="updateEnchants()"></select>
+</div>
+<div class="section">
+  <h2>Verzauberungen & XP wählen</h2>
+  <div id="enchants"></div>
+</div>
+<div class="section">
+  <button onclick="calculate()">Berechnen</button>
+  <div id="warn" class="warn" style="display:none"></div>
+  <div id="steps" class="steps"></div>
+</div>
+<div class="section export">
+  <h2>Exportieren</h2>
+  <button onclick="copyExport()">Markdown kopieren</button>
+  <pre id="exportBox" class="exportbox"></pre>
+</div>
+</div>
+<script>
+const enchList = {
+  protection:{en:"Protection",de:"Schutz",max:4,cost:[0,1,2,3,4]},
+  fire_protection:{en:"Fire Protection",de:"Feuerschutz",max:4,cost:[0,1,2,3,4]},
+  blast_protection:{en:"Blast Protection",de:"Explosionsschutz",max:4,cost:[0,1,2,3,4]},
+  projectile_protection:{en:"Projectile Protection",de:"Geschossschutz",max:4,cost:[0,1,2,3,4]},
+  aqua_affinity:{en:"Aqua Affinity",de:"Wasseraffinität",max:1,cost:[0,2]},
+  respiration:{en:"Respiration",de:"Atmung",max:3,cost:[0,4,8,12]},
+  thorns:{en:"Thorns",de:"Dornen",max:3,cost:[0,8,16,24]},
+  swift_sneak:{en:"Swift Sneak",de:"Schnellschleichen",max:3,cost:[0,1,2,3]},
+  feather_falling:{en:"Feather Falling",de:"Federfall",max:4,cost:[0,1,2,3,4]},
+  depth_strider:{en:"Depth Strider",de:"Wasserläufer",max:3,cost:[0,4,8,12]},
+  frost_walker:{en:"Frost Walker",de:"Eisläufer",max:2,cost:[0,4,8]},
+  soul_speed:{en:"Soul Speed",de:"Seelengeschwindigkeit",max:3,cost:[0,8,16,24]},
+  sharpness:{en:"Sharpness",de:"Schärfe",max:5,cost:[0,1,2,3,4,5]},
+  smite:{en:"Smite",de:"Bann",max:5,cost:[0,1,2,3,4,5]},
+  bane:{en:"Bane of Arthropods",de:"Fluch der Gliederfüßer",max:5,cost:[0,1,2,3,4,5]},
+  fire_aspect:{en:"Fire Aspect",de:"Feueraspekt",max:2,cost:[0,4,8]},
+  knockback:{en:"Knockback",de:"Rückstoß",max:2,cost:[0,1,2]},
+  looting:{en:"Looting",de:"Plünderung",max:3,cost:[0,4,8,12]},
+  sweeping:{en:"Sweeping Edge",de:"Schwungkraft",max:3,cost:[0,4,8,12]},
+  power:{en:"Power",de:"Stärke",max:5,cost:[0,1,2,3,4,6]},
+  punch:{en:"Punch",de:"Schlag",max:2,cost:[0,4,8]},
+  flame:{en:"Flame",de:"Flamme",max:1,cost:[0,4]},
+  infinity:{en:"Infinity",de:"Unendlichkeit",max:1,cost:[0,8]},
+  quick_charge:{en:"Quick Charge",de:"Schnellladen",max:3,cost:[0,1,2,3]},
+  multishot:{en:"Multishot",de:"Mehrfachschuss",max:1,cost:[0,4]},
+  piercing:{en:"Piercing",de:"Durchschlag",max:4,cost:[0,1,2,3,4]},
+  loyalty:{en:"Loyalty",de:"Treue",max:3,cost:[0,1,2,3]},
+  impaling:{en:"Impaling",de:"Harpune",max:5,cost:[0,4,8,12,16,20]},
+  riptide:{en:"Riptide",de:"Sog",max:3,cost:[0,4,8,12]},
+  channeling:{en:"Channeling",de:"Kanalisierung",max:1,cost:[0,8]},
+  density:{en:"Density",de:"Dichte",max:5,cost:[0,1,2,3,4,5]},
+  breach:{en:"Breach",de:"Durchbruch",max:4,cost:[0,4,8,12,16]},
+  wind_burst:{en:"Wind Burst",de:"Windstoß",max:3,cost:[0,4,8,12]},
+  efficiency:{en:"Efficiency",de:"Effizienz",max:5,cost:[0,1,2,3,4,5]},
+  unbreaking:{en:"Unbreaking",de:"Haltbarkeit",max:3,cost:[0,2,4,6]},
+  fortune:{en:"Fortune",de:"Glück",max:3,cost:[0,4,8,12]},
+  silk_touch:{en:"Silk Touch",de:"Behutsamkeit",max:1,cost:[0,16]},
+  luck_of_the_sea:{en:"Luck of the Sea",de:"Glück des Meeres",max:3,cost:[0,4,8,12]},
+  lure:{en:"Lure",de:"Köder",max:3,cost:[0,4,8,12]},
+  mending:{en:"Mending",de:"Reparatur",max:1,cost:[0,12]},
+  curse_of_vanishing:{en:"Curse of Vanishing",de:"Fluch des Verschwindens",max:1,cost:[0,4]},
+  curse_of_binding:{en:"Curse of Binding",de:"Fluch der Bindung",max:1,cost:[0,4]}
+};
+const allItems = [ /* wie vorher - nicht gekürzt */  
+  {k:"helmet", l:"Helmet / Helm"}, {k:"turtle_shell", l:"Turtle Shell / Schildkrötenpanzer"},
+  {k:"chestplate", l:"Chestplate / Brustplatte"}, {k:"leggings", l:"Leggings / Beinschutz"},
+  {k:"boots", l:"Boots / Stiefel"}, {k:"sword", l:"Sword / Schwert"}, {k:"bow", l:"Bow / Bogen"},
+  {k:"crossbow", l:"Crossbow / Armbrust"}, {k:"trident", l:"Trident / Dreizack"},
+  {k:"mace", l:"Mace / Streitkolben"}, {k:"pickaxe", l:"Pickaxe / Spitzhacke"},
+  {k:"axe", l:"Axe / Axt"}, {k:"shovel", l:"Shovel / Schaufel"}, {k:"hoe", l:"Hoe / Hacke"},
+  {k:"shears", l:"Shears / Schere"}, {k:"fishing_rod", l:"Fishing Rod / Angel"},
+  {k:"shield", l:"Shield / Schild"}, {k:"elytra", l:"Elytra / Elytren"},
+  {k:"flint_and_steel", l:"Flint and Steel / Feuerzeug"},
+  {k:"carrot_on_a_stick", l:"Carrot on a Stick / Karottenrute"},
+  {k:"warped_fungus_on_a_stick", l:"Warped Fungus on a Stick / Wirrpilzrute"},
+  {k:"compass", l:"Compass / Kompass"}, {k:"lodestone_compass", l:"Lodestone Compass / Leitstein-Kompass"},
+  {k:"recovery_compass", l:"Recovery Compass / Bergungskompass"},
+  {k:"all_books", l:"Verzaubertes Buch / Enchanted Book"}
+];
+const items = { // ... komplett wie vorher ... 
+  helmet:["protection","fire_protection","blast_protection","projectile_protection","aqua_affinity","respiration","thorns","unbreaking","mending","curse_of_vanishing","curse_of_binding"],
+  turtle_shell:["protection","fire_protection","blast_protection","projectile_protection","respiration","thorns","unbreaking","mending","curse_of_vanishing","curse_of_binding"],
+  chestplate:["protection","fire_protection","blast_protection","projectile_protection","thorns","unbreaking","mending","swift_sneak","curse_of_vanishing","curse_of_binding"],
+  leggings:["protection","fire_protection","blast_protection","projectile_protection","thorns","unbreaking","mending","swift_sneak","curse_of_vanishing","curse_of_binding"],
+  boots:["protection","fire_protection","blast_protection","projectile_protection","feather_falling","frost_walker","depth_strider","soul_speed","thorns","unbreaking","mending","curse_of_vanishing","curse_of_binding"],
+  sword:["sharpness","smite","bane","knockback","fire_aspect","looting","sweeping","unbreaking","mending","curse_of_vanishing"],
+  bow:["power","punch","flame","infinity","unbreaking","mending","curse_of_vanishing"],
+  crossbow:["quick_charge","multishot","piercing","unbreaking","mending","curse_of_vanishing"],
+  trident:["loyalty","impaling","riptide","channeling","unbreaking","mending","curse_of_vanishing"],
+  mace:["density","breach","wind_burst","sharpness","smite","bane","fire_aspect","unbreaking","mending","curse_of_vanishing"],
+  pickaxe:["efficiency","unbreaking","fortune","mending","silk_touch","curse_of_vanishing"],
+  axe:["efficiency","unbreaking","fortune","mending","silk_touch","sharpness","smite","bane","curse_of_vanishing"],
+  shovel:["efficiency","unbreaking","fortune","mending","silk_touch","curse_of_vanishing"],
+  hoe:["efficiency","unbreaking","fortune","mending","silk_touch","curse_of_vanishing"],
+  shears:["efficiency","unbreaking","mending","curse_of_vanishing"],
+  fishing_rod:["luck_of_the_sea","lure","unbreaking","mending","curse_of_vanishing"],
+  shield:["unbreaking","mending","curse_of_vanishing"],
+  elytra:["unbreaking","mending","curse_of_vanishing"],
+  flint_and_steel:["unbreaking","mending","curse_of_vanishing"],
+  carrot_on_a_stick:["unbreaking","mending","curse_of_vanishing"],
+  warped_fungus_on_a_stick:["unbreaking","mending","curse_of_vanishing"],
+  compass:["curse_of_vanishing"],
+  lodestone_compass:["curse_of_vanishing"],
+  recovery_compass:["curse_of_vanishing"],
+  all_books:Object.keys(enchList)
+};
+const incompat = {
+  protection:    ["fire_protection","blast_protection","projectile_protection"],
+  fire_protection: ["protection","blast_protection","projectile_protection"],
+  blast_protection: ["protection","fire_protection","projectile_protection"],
+  projectile_protection: ["protection","fire_protection","blast_protection"],
+  fortune: ["silk_touch"], silk_touch: ["fortune"],
+  sharpness: ["smite","bane"], smite:["sharpness","bane"], bane:["sharpness","smite"],
+  loyalty: ["riptide"], riptide:["loyalty"],
+  multishot:["piercing"], piercing:["multishot"]
+};
+function getCurrentSelections(){
+  let map = {};
+  Object.keys(enchList).forEach(e=>{
+    let v=document.getElementById("ench_"+e);
+    if(v && +v.value>0) map[e]=+v.value;
+  });
+  return map;
+}
+function isIncompatible(eid, current){
+  for(let other in current){
+    if(other===eid) continue;
+    if(incompat[eid]&&incompat[eid].includes(other)) return other;
+    if(incompat[other]&&incompat[other].includes(eid)) return other;
+  }
+  return null;
+}
+function updateEnchants(){
+  let sel=document.getElementById("item"),
+      key=sel.value, enchdiv=document.getElementById("enchants"),arr=items[key]||[];
+  let current = getCurrentSelections();
+  enchdiv.innerHTML="";
+  arr.forEach(e=>{
+    const obj=enchList[e];
+    let selectedValue = current[e]||0;
+    let html='<div><label>'+obj.en+' / '+obj.de+'</label>';
+    html+='<select id="ench_'+e+'" onchange="updateEnchants()">';
+    html+='<option value="0">0 - Nicht verwenden</option>';
+    for(let i=1;i<=obj.max;i++) {
+      // Das Level ist NUR gesperrt, wenn der User ein inkompatibles anderes Enchantment gewählt hat und dieses hier gerade NICHT gewählt ist.
+      let optDisabled = "";
+      let tip = "";
+      let incompWith = isIncompatible(e,current);
+      if(selectedValue==0 && incompWith){
+        optDisabled=' disabled ';
+        let cobj=enchList[incompWith];
+        if(cobj) tip=' title="Inkompatibel mit '+cobj.en+' / '+cobj.de+'" ';
+      }
+      html+='<option value="'+i+'"'+(selectedValue==i?' selected':'')+optDisabled+tip+'>'+i+'</option>';
+    }
+    html+='</select></div>';
+    enchdiv.innerHTML+=html;
+  });
+}
+function formatCombo(desc){
+  return desc.replace(/(\w[\w\s\-']*?) \/ ([^+]+?) (\d+)/g, function(_,en,de,xp){
+      return "<b class='ench'>"+en.trim()+"</b> (<span class='dech'>"+de.trim()+"</span>) <em>"+xp+" XP</em>";
+  });
+}
+function calculate(){
+  let sel=document.getElementById("item"), key=sel.value, curEnchs=items[key]||[];
+  let chosen=[];
+  curEnchs.forEach(e=>{
+    let v=document.getElementById("ench_"+e);if(!v)return;
+    let lvl=+v.value;if(lvl>0)chosen.push({id:e,level:lvl});
+  });
+  // Komp.check
+  for(let i=0;i<chosen.length;i++)
+    for(let j=0;j<chosen.length;j++){
+      if(i>=j) continue;
+      if((incompat[chosen[i].id]||[]).includes(chosen[j].id) ||
+         (incompat[chosen[j].id]||[]).includes(chosen[i].id)) {
+        alert("Diese Kombination ist nicht möglich:\n"+enchList[chosen[i].id].en+" + "+enchList[chosen[j].id].en);
+        return;
+      }
+    }
+  if(!chosen.length){alert("Bitte mindestens eine Verzauberung wählen!");return;}
+  chosen.sort((a,b)=>enchList[b.id].cost[b.level]-enchList[a.id].cost[a.level]);
+  let steps=[], cost=0, maxcost=0;
+  let queue=chosen.map(e=>({desc:enchList[e.id].en+" / "+enchList[e.id].de+" "+enchList[e.id].cost[e.level], cost:enchList[e.id].cost[e.level],pen:0}));
+  function combine(a,b){
+    let cst=a.cost+b.cost+Math.max(a.pen,b.pen);
+    cost+=cst; maxcost=Math.max(maxcost,cst);
+    return {desc:`${a.desc} + ${b.desc}`, cost:0, pen:Math.max(a.pen,b.pen)+1,raw:cst};
+  }
+  let round=1;
+  while(queue.length>1){
+    let next=[];
+    for(let i=0;i<queue.length;i+=2){
+      if(i+1<queue.length){
+        let res=combine(queue[i],queue[i+1]);
+        steps.push({txt:`Schritt ${round}: Kombiniere ${formatCombo(res.desc)}. Kosten: ${res.raw} XP`, cst:res.raw});
+        next.push(res);
+      }else{next.push(queue[i]);}
+    }queue=next;round++;
+  }
+  if(queue.length){
+    let txt = `Schritt ${round}: Endgültig alles kombinieren (${formatCombo(queue[0].desc)}) und das Item benennen (kostet <em>1 XP</em>). Kosten: <em>${queue[0].pen+1} XP</em>`;
+    steps.push({txt, cst:queue[0].pen+1}); cost += queue[0].pen+1;
+    maxcost=Math.max(maxcost,queue[0].pen+1);
+  }
+  document.getElementById("steps").innerHTML='<h2>Anleitung & Gesamtkosten</h2>' + steps.map(s=>`<div class="step">${s.txt}</div>`).join('');
+  let warnDiv=document.getElementById("warn");
+  warnDiv.style.display=(maxcost>39)?"block":"none";
+  warnDiv.textContent=(maxcost>39)?"Warnung: Mindestens ein Schritt benötigt mehr als 39 Level ('Too expensive!')":"";
+  document.getElementById("exportBox").textContent=
+    steps.map(s=>s.txt.replace(/<[^>]+>/g,'')).join("\n") + `\n\nGesamtkosten: ${cost} XP`;
+}
+function copyExport(){
+  navigator.clipboard.writeText(document.getElementById("exportBox").textContent);
+}
+document.addEventListener('DOMContentLoaded',function(){
+  let sel=document.getElementById("item");
+  sel.innerHTML=allItems.map(i=>`<option value="${i.k}">${i.l}</option>`).join("");
+  updateEnchants();
+});
+</script>
+</body>
+</html>
